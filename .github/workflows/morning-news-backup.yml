@@ -3,6 +3,7 @@ name: Morning Telegram News Backup
 on:
   schedule:
     - cron: "10 21 * * *"
+    - cron: "56 23 * * *"
   workflow_dispatch:
 
 permissions:
