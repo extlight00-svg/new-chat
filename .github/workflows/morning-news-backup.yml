@@ -1,0 +1,42 @@
+name: Morning Telegram News Backup
+
+on:
+  schedule:
+    - cron: "10 21 * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  backup-send-news:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check primary briefing
+        id: check-primary
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/check_primary_briefing.py
+
+      - name: Send backup Telegram news briefing
+        if: steps.check-primary.outputs.should_send == 'true'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scripts/morning_news.py
+
+      - name: Report skipped backup
+        if: steps.check-primary.outputs.should_send != 'true'
+        run: echo "Primary briefing succeeded; backup send skipped."
