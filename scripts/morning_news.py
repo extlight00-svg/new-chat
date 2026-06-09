@@ -161,11 +161,12 @@ def collect(category, limit):
 
 def format_item(index, item):
     source = f" / {item['source']}" if item.get("source") else ""
-    return f"{index}. {item['title']}{source}\n   {summarize(item)}\n   {item['link']}"
+    return f"{index}. {item['title']}{source} | {item['link']}"
 
 
 def format_section_item(category, index, item):
-    return f"{format_item(index, item)}\n   {importance_note(category, item)}"
+    note = importance_note(category, item).replace("왜 중요: ", "")
+    return f"{format_item(index, item)} | {note}"
 
 
 def lead_sentence(politics, economy):
