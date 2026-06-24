@@ -2,7 +2,7 @@ name: Morning Telegram News Briefing
 
 on:
   schedule:
-    - cron: "7 21 * * *"
+    - cron: "55 21 * * *"
   workflow_dispatch:
 
 jobs:

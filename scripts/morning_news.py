@@ -160,12 +160,14 @@ def collect(category, limit):
 
 
 def format_item(index, item):
-    source = f" / {item['source']}" if item.get("source") else ""
-    return f"{index}. {item['title']}{source} | {item['link']}"
+    title = html.escape(item["title"])
+    source = f" / {html.escape(item['source'])}" if item.get("source") else ""
+    link = html.escape(item["link"], quote=True)
+    return f'{index}. {title}{source} | <a href="{link}">기사 보기</a>'
 
 
 def format_section_item(category, index, item):
-    note = importance_note(category, item).replace("왜 중요: ", "")
+    note = html.escape(importance_note(category, item).replace("왜 중요: ", ""))
     return f"{format_item(index, item)} | {note}"
 
 
@@ -238,6 +240,7 @@ def send_telegram_message(token, chat_id, message):
         {
             "chat_id": chat_id,
             "text": message,
+            "parse_mode": "HTML",
             "disable_web_page_preview": "true",
         }
     ).encode("utf-8")

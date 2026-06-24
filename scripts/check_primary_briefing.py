@@ -34,7 +34,7 @@ def main():
         raise RuntimeError("GITHUB_OUTPUT is required")
 
     now = datetime.now(timezone.utc)
-    window_start = now.replace(hour=21, minute=5, second=0, microsecond=0)
+    window_start = now.replace(hour=21, minute=50, second=0, microsecond=0)
     if now < window_start:
         window_start -= timedelta(days=1)
 
