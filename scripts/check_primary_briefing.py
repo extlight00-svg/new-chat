@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 
 REPOSITORY = "extlight00-svg/new-chat"
 PRIMARY_WORKFLOW = "morning-news.yml"
+BACKUP_WORKFLOW = "morning-news-backup.yml"
 
 
 def github_api(path, token):
@@ -38,20 +39,24 @@ def main():
     if now < window_start:
         window_start -= timedelta(days=1)
 
-    query = urllib.parse.urlencode({"event": "schedule", "per_page": "20"})
-    payload = github_api(
-        f"/repos/{REPOSITORY}/actions/workflows/{PRIMARY_WORKFLOW}/runs?{query}",
-        token,
-    )
-
     found_success = False
-    for run in payload.get("workflow_runs", []):
-        created_at = datetime.fromisoformat(run["created_at"].replace("Z", "+00:00"))
-        if created_at < window_start:
-            continue
-        if run.get("status") == "completed" and run.get("conclusion") == "success":
-            found_success = True
-            print(f"Primary briefing already succeeded: {run.get('html_url')}")
+    query = urllib.parse.urlencode({"event": "schedule", "per_page": "20"})
+    for workflow in [PRIMARY_WORKFLOW, BACKUP_WORKFLOW]:
+        payload = github_api(
+            f"/repos/{REPOSITORY}/actions/workflows/{workflow}/runs?{query}",
+            token,
+        )
+        for run in payload.get("workflow_runs", []):
+            created_at = datetime.fromisoformat(run["created_at"].replace("Z", "+00:00"))
+            if created_at < window_start:
+                continue
+            if run.get("id") == int(os.environ.get("GITHUB_RUN_ID", "0")):
+                continue
+            if run.get("status") == "completed" and run.get("conclusion") == "success":
+                found_success = True
+                print(f"Briefing already succeeded via {workflow}: {run.get('html_url')}")
+                break
+        if found_success:
             break
 
     with open(output_path, "a", encoding="utf-8") as output:
