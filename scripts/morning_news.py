@@ -431,13 +431,24 @@ def send_telegram(message):
         send_telegram_message(token, chat_id, f"{prefix}{chunk}")
 
 
+def is_morning_window(now):
+    start = now.replace(hour=5, minute=30, second=0, microsecond=0)
+    end = now.replace(hour=8, minute=0, second=0, microsecond=0)
+    return start <= now <= end
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--env-file", default=".telegram_news.env")
+    parser.add_argument("--require-morning-window", action="store_true")
     args = parser.parse_args()
 
     load_dotenv(args.env_file)
+    now = datetime.now(ZoneInfo("Asia/Seoul"))
+    if args.require_morning_window and not is_morning_window(now):
+        print(f"Skipped Telegram news briefing outside morning window: {now:%Y-%m-%d %H:%M} KST")
+        return
     message = build_message()
     if args.dry_run:
         print(message)
