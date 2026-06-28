@@ -9,7 +9,7 @@ import textwrap
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
-from datetime import datetime
+from datetime import datetime, time, timedelta
 from email.utils import parsedate_to_datetime
 from zoneinfo import ZoneInfo
 
@@ -34,12 +34,88 @@ YOUTUBE_NEWS_SOURCES = [
     "TV조선 뉴스",
     "오마이TV",
 ]
+YOUTUBE_TITLE_MARKERS = [
+    "KBS",
+    "MBC",
+    "SBS",
+    "JTBC",
+    "YTN",
+    "연합뉴스TV",
+    "채널A",
+    "MBN",
+    "TV조선",
+    "오마이TV",
+]
+CATEGORY_KEYWORDS = {
+    "politics": [
+        "정치",
+        "국회",
+        "대통령",
+        "대통령실",
+        "정부",
+        "정당",
+        "민주당",
+        "국민의힘",
+        "조국혁신당",
+        "개혁신당",
+        "장관",
+        "청문회",
+        "특검",
+        "검찰",
+        "법원",
+        "외교",
+        "안보",
+        "북한",
+    ],
+    "economy": [
+        "경제",
+        "환율",
+        "원·달러",
+        "원/달러",
+        "유가",
+        "금리",
+        "물가",
+        "증시",
+        "코스피",
+        "코스닥",
+        "반도체",
+        "자동차",
+        "수출",
+        "해운",
+        "항공",
+        "석유",
+        "정유",
+        "중동",
+        "이란",
+        "호르무즈",
+    ],
+    "global_tech": [
+        "국제",
+        "미국",
+        "중국",
+        "일본",
+        "러시아",
+        "중동",
+        "이란",
+        "외교",
+        "안보",
+        "공급망",
+        "AI",
+        "인공지능",
+        "반도체",
+        "배터리",
+        "플랫폼",
+        "기술",
+    ],
+}
 GARAK_DONG_LATITUDE = 37.4933
 GARAK_DONG_LONGITUDE = 127.1183
+KST = ZoneInfo("Asia/Seoul")
 
 
 def google_news_url(query):
-    params = urllib.parse.urlencode({"q": query, "hl": "ko", "gl": "KR", "ceid": "KR:ko"})
+    recent_query = f"({query}) when:2d"
+    params = urllib.parse.urlencode({"q": recent_query, "hl": "ko", "gl": "KR", "ceid": "KR:ko"})
     return f"https://news.google.com/rss/search?{params}"
 
 
@@ -162,6 +238,34 @@ def normalized_source(item):
         if source in text:
             return source
     return source_name or "기타"
+
+
+def recent_cutoff(now=None):
+    now = now or datetime.now(KST)
+    yesterday = now.date() - timedelta(days=1)
+    return datetime.combine(yesterday, time.min, tzinfo=KST)
+
+
+def is_recent_item(item, cutoff):
+    published_at = item.get("published_at")
+    if not published_at:
+        return False
+    return published_at.astimezone(KST) >= cutoff
+
+
+def is_allowed_youtube_item(item):
+    if "YouTube" not in item.get("source", ""):
+        return True
+    text = source_text(item)
+    return any(marker in text for marker in YOUTUBE_TITLE_MARKERS)
+
+
+def matches_category(category, item):
+    keywords = CATEGORY_KEYWORDS.get(category, [])
+    if not keywords:
+        return True
+    text = f"{item.get('title', '')} {item.get('description', '')}"
+    return any(keyword in text for keyword in keywords)
 
 
 def weather_description(code):
@@ -291,6 +395,7 @@ def importance_note(category, item):
 
 
 def collect(category, limit):
+    cutoff = recent_cutoff()
     items = []
     for url in FEEDS[category]:
         try:
@@ -298,6 +403,9 @@ def collect(category, limit):
         except Exception as exc:
             print(f"Feed failed: {url} ({exc})", file=sys.stderr)
     items = dedupe(items)
+    items = [item for item in items if is_recent_item(item, cutoff)]
+    items = [item for item in items if is_allowed_youtube_item(item)]
+    items = [item for item in items if matches_category(category, item)]
     items.sort(
         key=lambda item: (
             source_rank(item),
@@ -327,7 +435,11 @@ def format_item(index, item):
     title = html.escape(item["title"])
     source = f" / {html.escape(item['source'])}" if item.get("source") else ""
     link = html.escape(item["link"], quote=True)
-    return f'{index}. {title}{source} | <a href="{link}">기사 보기</a>'
+    published_at = item.get("published_at")
+    published = ""
+    if published_at:
+        published = f" ({published_at.astimezone(KST):%m-%d %H:%M})"
+    return f'{index}. {title}{source}{published} | <a href="{link}">기사 보기</a>'
 
 
 def format_section_item(category, index, item):
